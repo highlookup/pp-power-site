@@ -2,8 +2,8 @@ name: 站点数据月度更新
 
 on:
   schedule:
-    # 每月 12 日 UTC 04:00 = 北京时间 12:00（央行 M2 发布后）
-    - cron: '0 4 12 * *'
+    # M2 通常每月 25 日公布 -> 25/26/27 各跑一次（北京时间 12:20）
+    - cron: '20 4 25-27 * *'
   workflow_dispatch:
 
 permissions:
