@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A股购买力顶底模型 · 月度监测</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--panel:#161b22;--panel2:#1c2330;--line:#2b3440;
+  --txt:#e6edf3;--dim:#8b949e;--dim2:#6e7681;
+  --red:#f85149;--green:#3fb950;--gold:#d29922;--blue:#58a6ff;--cyan:#39c5cf;
+}
+body{
+  background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;padding:20px 16px 48px;
+}
+.wrap{max-width:1180px;margin:0 auto}
+
+/* ---------- 头部 ---------- */
+.head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.head h1{font-size:19px;font-weight:600;letter-spacing:.3px}
+.head .sub{font-size:12px;color:var(--dim2)}
+.badge{
+  font-size:11px;padding:2px 8px;border-radius:20px;
+  background:rgba(88,166,255,.12);color:var(--blue);border:1px solid rgba(88,166,255,.3)
+}
+
+/* ---------- 结论主卡 ---------- */
+.hero{
+  background:linear-gradient(150deg,#161b22 0%,#1a2230 100%);
+  border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:14px;
+  position:relative;overflow:hidden;
+}
+.hero::before{
+  content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;
+  background:radial-gradient(circle,rgba(88,166,255,.10),transparent 70%);
+}
+.hero-top{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.month{font-size:13px;color:var(--dim);letter-spacing:1px}
+.price{font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.price small{font-size:15px;font-weight:400;color:var(--dim);margin-left:5px}
+.zone{
+  font-size:13px;font-weight:600;padding:5px 13px;border-radius:8px;
+  border:1px solid;margin-bottom:4px
+}
+.zone.mid{color:#e3b341;background:rgba(210,153,34,.12);border-color:rgba(210,153,34,.35)}
+.zone.top{color:var(--red);background:rgba(248,81,73,.12);border-color:rgba(248,81,73,.35)}
+.zone.bot{color:var(--green);background:rgba(63,185,80,.12);border-color:rgba(63,185,80,.35)}
+
+/* 通道位置条 */
+.gauge{margin:4px 0 18px}
+.gauge-bar{
+  height:10px;border-radius:6px;position:relative;overflow:visible;
+  background:linear-gradient(90deg,#238636 0%,#2ea043 15%,#9e6a03 30%,#9e6a03 70%,#da3633 90%,#f85149 100%);
+  opacity:.55
+}
+.gauge-fill{
+  position:absolute;top:-3px;width:3px;height:16px;background:#fff;border-radius:2px;
+  box-shadow:0 0 8px rgba(255,255,255,.85);transition:left .5s
+}
+.gauge-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--dim2);margin-top:6px}
+.gauge-now{font-size:13px;color:var(--txt);margin-bottom:7px}
+.gauge-now b{font-size:19px;color:var(--gold);font-variant-numeric:tabular-nums}
+
+/* 指标网格 */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.cell{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.cell .k{font-size:11px;color:var(--dim2);margin-bottom:5px}
+.cell .v{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.cell .v small{font-size:11px;font-weight:400;color:var(--dim2);margin-left:3px}
+
+/* ---------- 图表区 ---------- */
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:18px 18px 14px;margin-bottom:14px
+}
+.card h2{font-size:14px;font-weight:600;margin-bottom:3px}
+.card .desc{font-size:11.5px;color:var(--dim2);margin-bottom:14px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.legend i.dot{width:7px;height:7px;border-radius:50%}
+
+/* ---------- 表格 ---------- */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th{font-size:11px;color:var(--dim2);font-weight:500;text-align:right}
+th:first-child,td:first-child{text-align:left}
+tbody tr:hover{background:rgba(88,166,255,.05)}
+.tag{font-size:10.5px;padding:1px 7px;border-radius:10px}
+.tag.hit{background:rgba(248,81,73,.15);color:var(--red)}
+.tag.low{background:rgba(63,185,80,.15);color:var(--green)}
+.mono{font-variant-numeric:tabular-nums}
+
+/* ---------- 说明 ---------- */
+.notes{font-size:12px;color:var(--dim);line-height:1.9}
+.notes b{color:var(--txt);font-weight:600}
+.notes code{
+  background:var(--panel2);padding:1px 6px;border-radius:4px;
+  font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--cyan)
+}
+.foot{text-align:center;font-size:11px;color:var(--dim2);margin-top:26px;line-height:1.9}
+
+@media(max-width:640px){
+  .price{font-size:34px}
+  .hero{padding:18px}
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .cell .v{font-size:16px}
+  th,td{padding:6px 5px;font-size:11.5px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <h1>A股购买力顶底模型</h1>
+    <span class="badge">M2 / GDP 购买力通道</span>
+    <span class="sub" id="gen"></span>
+  </div>
+
+  <!-- 结论卡 -->
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="month" id="month"></div>
+        <div class="price"><span id="close"></span><small>点</small></div>
+      </div>
+      <div class="zone mid" id="zone"></div>
+    </div>
+
+    <div class="gauge">
+      <div class="gauge-now">通道位置 <b id="pos"></b> <span id="trend" style="font-size:12px;color:var(--dim)"></span></div>
+      <div class="gauge-bar"><div class="gauge-fill" id="marker" style="left:0"></div></div>
+      <div class="gauge-lbl"><span>0% 地板</span><span>50%</span><span>100% 天花板</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="cell"><div class="k">顶线 · 天花板</div><div class="v" id="top"></div></div>
+      <div class="cell"><div class="k">底线 · 地板</div><div class="v" id="bot"></div></div>
+      <div class="cell"><div class="k">购买力比 X</div><div class="v" id="x"></div></div>
+      <div class="cell"><div class="k">本月高低</div><div class="v" id="hl" style="font-size:15px"></div></div>
+      <div class="cell"><div class="k">M2 口径</div><div class="v" id="mtag" style="font-size:15px"></div></div>
+    </div>
+  </div>
+
+  <!-- 主图 -->
+  <div class="card">
+    <h2>购买力通道与上证指数（2000 - 至今，月线）</h2>
+    <div class="desc">红线为顶线、绿线为底线，阴影区为购买力通道；蓝线为上证月收盘</div>
+    <svg id="mainChart" viewBox="0 0 1120 400" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="legend">
+      <span><i style="background:#58a6ff"></i>上证收盘</span>
+      <span><i style="background:#f85149"></i>顶线 TOP</span>
+      <span><i style="background:#3fb950"></i>底线 BOT</span>
+      <span><i class="dot" style="background:#f85149"></i>历史触顶</span>
+      <span><i class="dot" style="background:#3fb950"></i>历史触底</span>
+    </div>
+  </div>
+
+  <!-- 通道位置图 -->
+  <div class="card">
+    <h2>通道位置（0% = 地板，100% = 天花板）</h2>
+    <div class="desc">≥90% 为贴顶预警区，≤15% 为贴底机会区。本轮 2026 年 5 月触及 100% 后回落</div>
+    <svg id="posChart" viewBox="0 0 1120 210" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="legend">
+      <span><i style="background:#d29922"></i>收盘位置</span>
+      <span><i style="background:rgba(248,81,73,.45)"></i>贴顶区 ≥90%</span>
+      <span><i style="background:rgba(63,185,80,.45)"></i>贴底区 ≤15%</span>
+    </div>
+  </div>
+
+  <!-- 锚点表 -->
+  <div class="card">
+    <h2>模型锚点与历史验证</h2>
+    <div class="desc">顶线由三轮流动性牛市顶拟合，底线由五轮历史大底拟合</div>
+    <table>
+      <thead>
+        <tr><th>类型</th><th>月份</th><th>指数</th><th>顶线</th><th>底线</th><th>通道位置</th><th>结果</th></tr>
+      </thead>
+      <tbody id="anchorBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 说明 -->
+  <div class="card">
+    <h2>模型说明</h2>
+    <div class="notes" id="notes"></div>
+  </div>
+
+  <div class="foot">
+    数据来源：上证指数（腾讯行情）、M2 供应量（中国人民银行 / 东方财富宏观库）、GDP（国家统计局）<br>
+    每月 12 日自动更新 · 本页为模型研究结果，不构成投资建议
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const fmt = (v, d=0) => v==null ? "—" : Number(v).toLocaleString("zh-CN",{minimumFractionDigits:d,maximumFractionDigits:d});
+
+/* ---------- 填充结论卡 ---------- */
+const st = DATA.state;
+document.getElementById("gen").textContent = "更新于 " + DATA.generated;
+document.getElementById("month").textContent = st.month + " 月度收盘";
+document.getElementById("close").textContent = fmt(st.close);
+document.getElementById("top").innerHTML = fmt(st.top) + '<small>点</small>';
+document.getElementById("bot").innerHTML = fmt(st.bot) + '<small>点</small>';
+document.getElementById("x").innerHTML = fmt(st.x) + '<small>×10⁴</small>';
+document.getElementById("hl").innerHTML = fmt(st.high) + ' / ' + fmt(st.low);
+document.getElementById("mtag").textContent = st.tag;
+document.getElementById("pos").textContent = (st.pos*100).toFixed(0) + "%";
+document.getElementById("trend").textContent = st.trend;
+
+const zEl = document.getElementById("zone");
+zEl.textContent = st.zone;
+zEl.className = "zone " + (st.pos>=0.9 ? "top" : st.pos<=0.15 ? "bot" : "mid");
+
+const marker = document.getElementById("marker");
+marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + "% - 1.5px)";
+
+/* ---------- 主图 ---------- */
+(function(){
+  const svg = document.getElementById("mainChart");
+  const W = 1120, H = 400, pad = {l:56, r:14, t:14, b:26};
+  const iw = W-pad.l-pad.r, ih = H-pad.t-pad.b;
+  const rows = DATA.rows;
+  const n = rows.length;
+
+  let maxV = 0, minV = Infinity;
+  rows.forEach(r=>{
+    maxV = Math.max(maxV, r.h, r.top);
+    minV = Math.min(minV, r.l, r.bot);
+  });
+  minV = Math.min(minV, 900); maxV = Math.max(maxV, 6600);
+  minV = Math.floor(minV/500)*500; maxV = Math.ceil(maxV/500)*500;
+
+  const X = i => pad.l + (n<2?0:iw*i/(n-1));
+  const Y = v => pad.t + ih*(1-(v-minV)/(maxV-minV));
+
+  const g = el("g", {}, svg);
+
+  /* 网格与刻度 */
+  const ticks = 6;
+  for (let i=0;i<=ticks;i++){
+    const v = minV + (maxV-minV)*i/ticks;
+    const y = Y(v);
+    el("line",{x1:pad.l,x2:W-pad.r,y1:y,y2:y,stroke:"#21262d","stroke-width":1},g);
+    const t = el("text",{x:pad.l-9,y:y+4,"text-anchor":"end",fill:"#6e7681","font-size":11},g);
+    t.textContent = fmt(v);
+  }
+
+  /* X 轴年份 */
+  let lastY = "";
+  rows.forEach((r,i)=>{
+    const y = r.m.slice(0,4);
+    if (y !== lastY && Number(y)%4===0){
+      lastY = y;
+      const x = X(i);
+      el("line",{x1:x,x2:x,y1:H-pad.b,y2:H-pad.b+4,stroke:"#30363d"},g);
+      const t = el("text",{x:x,y:H-pad.b+17,"text-anchor":"middle",fill:"#6e7681","font-size":11},g);
+      t.textContent = y;
+    }
+  });
+
+  /* 通道填充 */
+  let up = [], down = [];
+  rows.forEach((r,i)=>{ up.push([X(i), Y(r.top)]); });
+  for (let i=n-1;i>=0;i--) down.push([X(i), Y(rows[i].bot)]);
+  const area = up.concat(down).map(p=>p.join(",")).join(" ");
+  el("polygon",{points:area,fill:"rgba(88,166,255,.055)",stroke:"none"},g);
+
+  /* 顶线 / 底线 */
+  const pathOf = key => rows.map((r,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(r[key]).toFixed(1)).join(" ");
+  el("path",{d:pathOf("top"),fill:"none",stroke:"#f85149","stroke-width":1.6,opacity:.85},g);
+  el("path",{d:pathOf("bot"),fill:"none",stroke:"#3fb950","stroke-width":1.6,opacity:.85},g);
+
+  /* 上证收盘 */
+  el("path",{d:pathOf("c"),fill:"none",stroke:"#58a6ff","stroke-width":1.9,"stroke-linejoin":"round"},g);
+
+  /* 锚点标记 */
+  const mark = (month, color) => {
+    const i = rows.findIndex(r=>r.m===month);
+    if (i<0) return;
+    el("circle",{cx:X(i),cy:Y(rows[i].c),r:4.5,fill:color,stroke:"#0d1117","stroke-width":2},g);
+  };
+  DATA.anchors.top.forEach(a=>mark(a[0], "#f85149"));
+  DATA.anchors.bot.forEach(a=>mark(a[0], "#3fb950"));
+
+  /* 最新点 */
+  const li = n-1;
+  el("circle",{cx:X(li),cy:Y(rows[li].c),r:5,fill:"#58a6ff",stroke:"#0d1117","stroke-width":2},g);
+
+  /* 最新值标签 */
+  const lx = X(li), ly = Y(rows[li].c);
+  const anchor = lx > W-140 ? "end" : "start";
+  const off = lx > W-140 ? -10 : 10;
+  const lab = el("text",{x:lx+off,y:ly-9,"text-anchor":anchor,fill:"#58a6ff","font-size":12,"font-weight":"600"},g);
+  lab.textContent = fmt(st.close)+" 点";
+})();
+
+/* ---------- 通道位置图 ---------- */
+(function(){
+  const svg = document.getElementById("posChart");
+  const W = 1120, H = 210, pad = {l:56, r:14, t:12, b:24};
+  const iw = W-pad.l-pad.r, ih = H-pad.t-pad.b;
+  const rows = DATA.rows;
+  const n = rows.length;
+  const X = i => pad.l + (n<2?0:iw*i/(n-1));
+  const Y = p => pad.t + ih*(1-Math.min(Math.max(p,0),1.15)/1.15);
+  const g = el("g", {}, svg);
+
+  /* 区间底色 */
+  el("rect",{x:pad.l,y:Y(1.15),width:iw,height:Y(0.9)-Y(1.15),fill:"rgba(248,81,73,.13)"},g);
+  el("rect",{x:pad.l,y:Y(0.15),width:iw,height:Y(0)-Y(0.15),fill:"rgba(63,185,80,.13)"},g);
+
+  /* 刻度 */
+  [0,0.15,0.5,0.9,1].forEach(p=>{
+    const y = Y(p);
+    el("line",{x1:pad.l,x2:W-pad.r,y1:y,y2:y,stroke:"#21262d","stroke-width":1},g);
+    const t = el("text",{x:pad.l-9,y:y+4,"text-anchor":"end",fill:"#6e7681","font-size":11},g);
+    t.textContent = (p*100).toFixed(0)+"%";
+  });
+
+  /* 年份 */
+  let lastY="";
+  rows.forEach((r,i)=>{
+    const y = r.m.slice(0,4);
+    if (y!==lastY && Number(y)%4===0){
+      lastY=y;
+      const x=X(i);
+      const t=el("text",{x:x,y:H-pad.b+17,"text-anchor":"middle",fill:"#6e7681","font-size":11},g);
+      t.textContent=y;
+    }
+  });
+
+  /* 折线 */
+  const d = rows.map((r,i)=>{
+    const p = r.pos==null ? 0 : Math.min(Math.max(r.pos,0),1.15);
+    return (i?"L":"M")+X(i).toFixed(1)+","+Y(p).toFixed(1);
+  }).join(" ");
+  el("path",{d:d,fill:"none",stroke:"#d29922","stroke-width":1.7,"stroke-linejoin":"round"},g);
+
+  /* 当前点 */
+  const li=n-1;
+  const p = Math.min(Math.max(rows[li].pos,0),1.15);
+  el("circle",{cx:X(li),cy:Y(p),r:4.5,fill:"#d29922",stroke:"#0d1117","stroke-width":2},g);
+})();
+
+/* ---------- 锚点表 ---------- */
+(function(){
+  const body = document.getElementById("anchorBody");
+  const rows = DATA.rows;
+  const map = {};
+  rows.forEach(r=>map[r.m]=r);
+
+  const add = (type, month, idx) => {
+    const r = map[month];
+    if (!r) return;
+    const tr = document.createElement("tr");
+    const isTop = type==="顶";
+    const posv = isTop ? r.posH : r.posL;
+    const verdict = isTop
+      ? (posv>=0.95 ? '<span class="tag hit">触顶</span>' : '<span class="tag">未触顶</span>')
+      : (posv<=0.15 ? '<span class="tag low">触底</span>' : '<span class="tag">未触底</span>');
+    tr.innerHTML =
+      `<td>${isTop?'<span class="tag hit">顶线锚点</span>':'<span class="tag low">底线锚点</span>'}</td>`+
+      `<td class="mono">${month}</td>`+
+      `<td class="mono">${fmt(idx)}</td>`+
+      `<td class="mono">${fmt(r.top)}</td>`+
+      `<td class="mono">${fmt(r.bot)}</td>`+
+      `<td class="mono">${(posv*100).toFixed(0)}%</td>`+
+      `<td>${verdict}</td>`;
+    body.appendChild(tr);
+  };
+
+  DATA.anchors.top.forEach(a=>add("顶", a[0], a[1]));
+  DATA.anchors.bot.forEach(a=>add("底", a[0], a[1]));
+
+  /* 最新一行 */
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    `<td><b>当前</b></td>`+
+    `<td class="mono">${st.month}</td>`+
+    `<td class="mono">${fmt(st.close)}</td>`+
+    `<td class="mono">${fmt(st.top)}</td>`+
+    `<td class="mono">${fmt(st.bot)}</td>`+
+    `<td class="mono">${(st.pos*100).toFixed(0)}%</td>`+
+    `<td>${st.zone}</td>`;
+  body.appendChild(tr);
+})();
+
+/* ---------- 说明 ---------- */
+document.getElementById("notes").innerHTML = `
+<p><b>核心变量</b>：购买力比 <code>X = M2 月末余额(万亿) ÷ GDP 年化(万亿) × 10⁴</code>，衡量货币存量相对实体产出的规模。</p>
+<p><b>顶线</b> <code>TOP = ${DATA.params.Kt.toFixed(4)} × X + ${DATA.params.Bt.toFixed(2)}</code> —— 由三轮流动性牛市顶部（2007-10 的 6124、2015-06 的 5178、2026-05 的 4170）拟合。</p>
+<p><b>底线</b> <code>BOT = ${DATA.params.Kb.toFixed(4)} × X + ${DATA.params.Bb.toFixed(2)}</code> —— 由五轮历史大底（2008-10、2013-06、2016-01、2019-01、2024-09）拟合。</p>
+<p><b>通道位置</b> <code>(收盘 − 底线) ÷ (顶线 − 底线)</code>：≥90% 为贴顶预警，≤15% 为贴底机会。</p>
+<p><b>关于 2026-05</b>：原文作者 2024-10 预测本轮 A 股仅凭内资最多拉到 4170 点，实际 2026-05 周线收 4179 点后行情终结；本模型在该月顶线为 ${fmt(DATA.rows.find(r=>r.m==="2026-05")?.top||0)} 点，误差约 0.5%。</p>
+<p><b>数据口径</b>：M2 采用央行官方月度值（东方财富宏观库），GDP 采用国家统计局年度值并按月度线性插值年化。${DATA.gdpNote}</p>
+<p><b>局限</b>：2000—2006 年股权分置改革前，底线不适用；模型为原文思想的公开公式重构，原文未披露计算方法。</p>
+`;
+</script>
+</body>
+</html>
