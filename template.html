@@ -466,6 +466,15 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
   if (!reduceMotion){
     cur.style.animationDelay = (PDELAY+PDUR).toFixed(2) + "s";
     cur.classList.add("anim-pop");
+    /* 呼吸光环，与主图最新点一致 */
+    const curT = PDELAY + PDUR + 0.2;
+    const phalo = el("circle",{cx:X(li),cy:Y(p),r:4.5,fill:"none",
+                              stroke:"#d29922","stroke-width":1.5,opacity:0},g);
+    phalo.style.animation = "fadeIn .3s ease-out " + curT.toFixed(2) + "s forwards";
+    phalo.innerHTML = '<animate attributeName="r" values="4.5;12;4.5" dur="2.6s" repeatCount="indefinite" begin="'
+                      + curT.toFixed(2) + 's"/>'
+                      + '<animate attributeName="opacity" values="0.75;0;0.75" dur="2.6s" repeatCount="indefinite" begin="'
+                      + curT.toFixed(2) + 's"/>';
   }
 })();
 
