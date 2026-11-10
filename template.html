@@ -157,13 +157,14 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
       <span><i style="background:#3fb950"></i>底线 BOT</span>
       <span><i class="dot" style="background:#f85149"></i>历史触顶</span>
       <span><i class="dot" style="background:#3fb950"></i>历史触底</span>
+      <span><i style="background:rgba(139,148,158,.28)"></i>股权分置改革前（模型不适用）</span>
     </div>
   </div>
 
   <!-- 通道位置图 -->
   <div class="card">
     <h2>通道位置（0% = 地板，100% = 天花板）</h2>
-    <div class="desc">≥90% 为贴顶预警区，≤15% 为贴底机会区。本轮 2026 年 5 月触及 100% 后回落</div>
+    <div class="desc">≥90% 为贴顶预警区，≤15% 为贴底机会区。2000—2006 年因股权分置改革前制度差异，指数长期跌破底线（负值区间），该段无参考意义</div>
     <svg id="posChart" viewBox="0 0 1120 210" preserveAspectRatio="xMidYMid meet"></svg>
     <div class="legend">
       <span><i style="background:#d29922"></i>收盘位置</span>
@@ -279,6 +280,15 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
   const area = up.concat(down).map(p=>p.join(",")).join(" ");
   el("polygon",{points:area,fill:"rgba(88,166,255,.055)",stroke:"none"},g);
 
+  /* 股权分置改革前区间（2006-09 之前模型不适用） */
+  const grayIdx = rows.findIndex(r=>r.m >= "2006-10");
+  if (grayIdx > 0){
+    el("rect",{x:pad.l, y:pad.t, width:X(grayIdx)-pad.l, height:ih,
+               fill:"rgba(139,148,158,.10)"},g);
+    const gl = el("text",{x:pad.l+10, y:pad.t+18, fill:"#8b949e","font-size":11.5},g);
+    gl.textContent = "股权分置改革前：模型不适用（指数长期跌破底线）";
+  }
+
   /* 顶线 / 底线 */
   const pathOf = key => rows.map((r,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(r[key]).toFixed(1)).join(" ");
   el("path",{d:pathOf("top"),fill:"none",stroke:"#f85149","stroke-width":1.6,opacity:.85},g);
@@ -316,18 +326,29 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
   const rows = DATA.rows;
   const n = rows.length;
   const X = i => pad.l + (n<2?0:iw*i/(n-1));
-  const Y = p => pad.t + ih*(1-Math.min(Math.max(p,0),1.15)/1.15);
+  const PMIN = -0.20, PMAX = 1.15;
+  const Y = p => pad.t + ih*(1-(Math.min(Math.max(p,PMIN),PMAX)-PMIN)/(PMAX-PMIN));
   const g = el("g", {}, svg);
 
   /* 区间底色 */
-  el("rect",{x:pad.l,y:Y(1.15),width:iw,height:Y(0.9)-Y(1.15),fill:"rgba(248,81,73,.13)"},g);
+  el("rect",{x:pad.l,y:Y(PMAX),width:iw,height:Y(0.9)-Y(PMAX),fill:"rgba(248,81,73,.13)"},g);
   el("rect",{x:pad.l,y:Y(0.15),width:iw,height:Y(0)-Y(0.15),fill:"rgba(63,185,80,.13)"},g);
 
+  /* 股权分置改革前区间 */
+  const grayIdx = rows.findIndex(r=>r.m >= "2006-10");
+  if (grayIdx > 0){
+    el("rect",{x:pad.l,y:pad.t,width:X(grayIdx)-pad.l,height:ih,
+               fill:"rgba(139,148,158,.10)"},g);
+  }
+
   /* 刻度 */
-  [0,0.15,0.5,0.9,1].forEach(p=>{
+  [PMIN,0,0.15,0.5,0.9,1].forEach(p=>{
     const y = Y(p);
-    el("line",{x1:pad.l,x2:W-pad.r,y1:y,y2:y,stroke:"#21262d","stroke-width":1},g);
-    const t = el("text",{x:pad.l-9,y:y+4,"text-anchor":"end",fill:"#6e7681","font-size":11},g);
+    el("line",{x1:pad.l,x2:W-pad.r,y1:y,y2:y,
+      stroke: p===0?"#3d444d":"#21262d","stroke-width":1,
+      "stroke-dasharray": p===0?"3,3":""},g);
+    const t = el("text",{x:pad.l-9,y:y+4,"text-anchor":"end",
+      fill: p===0?"#8b949e":"#6e7681","font-size":11},g);
     t.textContent = (p*100).toFixed(0)+"%";
   });
 
@@ -345,14 +366,14 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
 
   /* 折线 */
   const d = rows.map((r,i)=>{
-    const p = r.pos==null ? 0 : Math.min(Math.max(r.pos,0),1.15);
+    const p = r.pos==null ? 0 : Math.min(Math.max(r.pos,PMIN),PMAX);
     return (i?"L":"M")+X(i).toFixed(1)+","+Y(p).toFixed(1);
   }).join(" ");
   el("path",{d:d,fill:"none",stroke:"#d29922","stroke-width":1.7,"stroke-linejoin":"round"},g);
 
   /* 当前点 */
   const li=n-1;
-  const p = Math.min(Math.max(rows[li].pos,0),1.15);
+  const p = Math.min(Math.max(rows[li].pos,PMIN),PMAX);
   el("circle",{cx:X(li),cy:Y(p),r:4.5,fill:"#d29922",stroke:"#0d1117","stroke-width":2},g);
 })();
 
@@ -406,8 +427,12 @@ document.getElementById("notes").innerHTML = `
 <p><b>底线</b> <code>BOT = ${DATA.params.Kb.toFixed(4)} × X + ${DATA.params.Bb.toFixed(2)}</code> —— 由五轮历史大底（2008-10、2013-06、2016-01、2019-01、2024-09）拟合。</p>
 <p><b>通道位置</b> <code>(收盘 − 底线) ÷ (顶线 − 底线)</code>：≥90% 为贴顶预警，≤15% 为贴底机会。</p>
 <p><b>关于 2026-05</b>：原文作者 2024-10 预测本轮 A 股仅凭内资最多拉到 4170 点，实际 2026-05 周线收 4179 点后行情终结；本模型在该月顶线为 ${fmt(DATA.rows.find(r=>r.m==="2026-05")?.top||0)} 点，误差约 0.5%。</p>
-<p><b>数据口径</b>：M2 采用央行官方月度值（东方财富宏观库），GDP 采用国家统计局年度值并按月度线性插值年化。${DATA.gdpNote}</p>
-<p><b>局限</b>：2000—2006 年股权分置改革前，底线不适用；模型为原文思想的公开公式重构，原文未披露计算方法。</p>
+<p><b>数据覆盖与局限（重要）</b></p>
+<p>① <b>2000—2006 年 9 月：模型不适用</b>。该阶段处于股权分置改革前，A 股约三分之二股份不流通，估值体系与全流通时代完全不同。上证指数在这几年长期<b>跌破模型底线</b>（2005-06 最低 998 点，底线约 1777 点，低至 −18%），图中灰色区域即此段。模型对该时期的点位<b>无预测意义</b>，仅作历史数据展示。</p>
+<p>② <b>2006 年 10 月以后</b>：进入全流通时代，模型有效。三轮牛市顶（2007-10、2015-06、2026-05）全部触顶，五轮大底全部落入底部区。</p>
+<p>③ <b>2012—2014 年</b>有若干月份收盘轻微跌破底线（最多 −8%），属长期磨底期的正常超调，随后 2014 年下半年起回升。</p>
+<p>④ <b>数据口径</b>：上证月线取自腾讯行情；M2 取自央行官方月度值（2008-01 起经东方财富宏观库逐月获取），<b>2000—2007 年因公开接口无月度值，采用央行年末官方余额几何插值</b>（标注“年末插值”），另有 2005-06、2007-10 两个官方月度值直接采用。GDP 采用国家统计局年度值按月线性插值年化。${DATA.gdpNote}</p>
+<p>⑤ <b>模型性质</b>：为公开资料中相关思想的公式重构，原文未披露计算方法。本页仅供研究参考，不构成投资建议。</p>
 `;
 </script>
 </body>

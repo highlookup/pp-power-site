@@ -24,6 +24,21 @@ GDP_Y = {
 }
 GDP_EST = {2026: 147.0}
 
+# ---------------- M2 年末官方值（万亿元，央行《金融统计数据报告》） ----------------
+# 东财宏观接口只提供 2008-01 以后的月度值，2000-2007 年用年末官方值几何插值补全
+M2_EOP = {
+    1999: 11.76, 2000: 13.46, 2001: 15.83, 2002: 18.32, 2003: 21.92,
+    2004: 25.01, 2005: 29.88, 2006: 34.56, 2007: 40.34, 2008: 47.52,
+    2009: 60.62, 2010: 72.58, 2011: 85.16, 2012: 97.42, 2013: 110.65,
+    2014: 122.84, 2015: 139.23, 2016: 155.01, 2017: 167.68, 2018: 182.67,
+    2019: 198.65, 2020: 218.68, 2021: 238.29, 2022: 266.43, 2023: 292.27,
+    2024: 313.50, 2025: 338.10, 2026: 364.11,
+}
+# 2008 年以前可得的零散官方月度值（央行公告），优先于插值
+M2_OFF_EARLY = {
+    "2005-06": 27.59, "2007-10": 39.42,
+}
+
 # ---------------- 模型锚点 ----------------
 # 顶线锚点：三轮流动性牛市顶（月份, 指数）
 TOP_ANCHORS = [("2007-10", 6124.04), ("2015-06", 5178.19), ("2026-05", 4170.0)]
@@ -106,6 +121,17 @@ def build_rows(sse, m2off):
     months = sorted([d for d in sse if d >= "2000-01"])
     last_off = max(m2off)
 
+    def eop_interp(d):
+        """用年末官方 M2 做几何插值（2008 年以前的补全方式）"""
+        y, m = int(d[:4]), int(d[5:7])
+        v0 = M2_EOP.get(y - 1)
+        v1 = M2_EOP.get(y)
+        if v0 and v1:
+            return round(geo(v0, v1, m, 12), 2), "年末插值"
+        if v1 and m == 12:
+            return round(v1, 2), "年末插值"
+        return None, None
+
     # 最近12个月同比增速（用于外推）
     def yoy_growth():
         ly, lm = int(last_off[:4]), int(last_off[5:7])
@@ -120,6 +146,8 @@ def build_rows(sse, m2off):
         h, l, c = sse[d]
         if d in m2off:
             m2v, tag = m2off[d], "官方"
+        elif d in M2_OFF_EARLY:
+            m2v, tag = M2_OFF_EARLY[d], "官方"
         else:
             prev_off = max([k for k in m2off if k < d], default=None)
             nxt_off = min([k for k in m2off if k > d], default=None)
@@ -139,7 +167,10 @@ def build_rows(sse, m2off):
                 m2v = m2off[prev_off] * (grow ** (steps / 12.0))
                 tag = "外推"
             else:
-                continue
+                # 早于接口覆盖范围：用年末官方值插值
+                m2v, tag = eop_interp(d)
+                if m2v is None:
+                    continue
         y, m = int(d[:4]), int(d[5:7])
         gdpv = gdp_at(y, m)
         x = m2v / gdpv * 10000
