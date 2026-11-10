@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>A股购买力顶底模型 · 月度监测</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -93,6 +96,33 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
 .tag.hit{background:rgba(248,81,73,.15);color:var(--red)}
 .tag.low{background:rgba(63,185,80,.15);color:var(--green)}
 .mono{font-variant-numeric:tabular-nums}
+
+/* ---------- 加载绘制动画 ---------- */
+@keyframes drawLine{
+  from{stroke-dashoffset:1}
+  to{stroke-dashoffset:0}
+}
+@keyframes fadeIn{
+  from{opacity:0}
+  to{opacity:1}
+}
+@keyframes popIn{
+  0%{opacity:0;transform:scale(.2)}
+  70%{opacity:1;transform:scale(1.25)}
+  100%{opacity:1;transform:scale(1)}
+}
+@keyframes riseIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.anim-dot{opacity:0;animation:fadeIn .45s ease-out forwards}
+.anim-pop{opacity:0;transform-box:fill-box;transform-origin:center;animation:popIn .5s cubic-bezier(.3,1.4,.5,1) forwards}
+.card,.hero{animation:riseIn .5s ease-out both}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .anim-dot,.anim-pop{opacity:1!important}
+}
 
 /* ---------- 说明 ---------- */
 .notes{font-size:12px;color:var(--dim);line-height:1.9}
@@ -209,6 +239,27 @@ function el(tag, attrs, parent){
 }
 const fmt = (v, d=0) => v==null ? "—" : Number(v).toLocaleString("zh-CN",{minimumFractionDigits:d,maximumFractionDigits:d});
 
+/* ---------- 绘制动画：让路径像被笔一笔画出来 ---------- */
+const reduceMotion = window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function drawPath(attrs, parent, opt){
+  /* opt: {delay, duration, ease} */
+  const o = opt || {};
+  const p = el("path", attrs, parent);
+  if (reduceMotion){ return p; }
+  let len = 0;
+  try { len = p.getTotalLength(); } catch(e){ len = 0; }
+  if (!len){ return p; }
+  const dur = o.duration || 1.8;
+  const delay = o.delay || 0;
+  p.style.strokeDasharray = len + " " + len;
+  p.style.strokeDashoffset = len;
+  p.style.animation = "drawLine " + dur + "s " + (o.ease || "cubic-bezier(.4,0,.2,1)")
+                       + " " + delay + "s forwards";
+  return p;
+}
+
 /* ---------- 填充结论卡 ---------- */
 const st = DATA.state;
 document.getElementById("gen").textContent = "更新于 " + DATA.generated;
@@ -278,7 +329,8 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
   rows.forEach((r,i)=>{ up.push([X(i), Y(r.top)]); });
   for (let i=n-1;i>=0;i--) down.push([X(i), Y(rows[i].bot)]);
   const area = up.concat(down).map(p=>p.join(",")).join(" ");
-  el("polygon",{points:area,fill:"rgba(88,166,255,.055)",stroke:"none"},g);
+  el("polygon",{points:area,fill:"rgba(88,166,255,.055)",stroke:"none",
+                style:"opacity:0;animation:fadeIn .8s ease-out 1.2s forwards"},g);
 
   /* 股权分置改革前区间（2006-09 之前模型不适用） */
   const grayIdx = rows.findIndex(r=>r.m >= "2006-10");
@@ -289,33 +341,66 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
     gl.textContent = "股权分置改革前：模型不适用（指数长期跌破底线）";
   }
 
-  /* 顶线 / 底线 */
+  /* 顶线 / 底线 —— 依次画出 */
   const pathOf = key => rows.map((r,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(r[key]).toFixed(1)).join(" ");
-  el("path",{d:pathOf("top"),fill:"none",stroke:"#f85149","stroke-width":1.6,opacity:.85},g);
-  el("path",{d:pathOf("bot"),fill:"none",stroke:"#3fb950","stroke-width":1.6,opacity:.85},g);
+  drawPath({d:pathOf("top"),fill:"none",stroke:"#f85149","stroke-width":1.6,opacity:.85},
+           g, {delay:0.15, duration:1.7});
+  drawPath({d:pathOf("bot"),fill:"none",stroke:"#3fb950","stroke-width":1.6,opacity:.85},
+           g, {delay:0.3, duration:1.7});
 
-  /* 上证收盘 */
-  el("path",{d:pathOf("c"),fill:"none",stroke:"#58a6ff","stroke-width":1.9,"stroke-linejoin":"round"},g);
+  /* 上证收盘 —— 主线，最后压轴画出 */
+  const CLOSE_DELAY = 0.55, CLOSE_DUR = 2.1;
+  drawPath({d:pathOf("c"),fill:"none",stroke:"#58a6ff","stroke-width":1.9,"stroke-linejoin":"round"},
+           g, {delay:CLOSE_DELAY, duration:CLOSE_DUR});
 
-  /* 锚点标记 */
+  /* 锚点标记 —— 随主线扫到该位置时弹出 */
+  const drawT = i => {   /* 第 i 个点被"画到"的时刻（秒） */
+    const frac = n>1 ? i/(n-1) : 1;
+    return CLOSE_DELAY + frac * CLOSE_DUR;
+  };
   const mark = (month, color) => {
     const i = rows.findIndex(r=>r.m===month);
     if (i<0) return;
-    el("circle",{cx:X(i),cy:Y(rows[i].c),r:4.5,fill:color,stroke:"#0d1117","stroke-width":2},g);
+    const c = el("circle",{cx:X(i),cy:Y(rows[i].c),r:4.5,fill:color,
+                           stroke:"#0d1117","stroke-width":2},g);
+    if (!reduceMotion){
+      c.style.animationDelay = drawT(i).toFixed(2) + "s";
+      c.classList.add("anim-pop");
+    }
   };
   DATA.anchors.top.forEach(a=>mark(a[0], "#f85149"));
   DATA.anchors.bot.forEach(a=>mark(a[0], "#3fb950"));
 
-  /* 最新点 */
+  /* 最新点 —— 主线画完后亮起 */
   const li = n-1;
-  el("circle",{cx:X(li),cy:Y(rows[li].c),r:5,fill:"#58a6ff",stroke:"#0d1117","stroke-width":2},g);
+  const endT = CLOSE_DELAY + CLOSE_DUR;
+  const dot = el("circle",{cx:X(li),cy:Y(rows[li].c),r:5,fill:"#58a6ff",
+                           stroke:"#0d1117","stroke-width":2},g);
+  if (!reduceMotion){
+    dot.style.animationDelay = endT.toFixed(2) + "s";
+    dot.classList.add("anim-pop");
+  }
+  /* 呼吸光环 */
+  if (!reduceMotion){
+    const halo = el("circle",{cx:X(li),cy:Y(rows[li].c),r:5,fill:"none",
+                              stroke:"#58a6ff","stroke-width":1.5,opacity:0},g);
+    halo.style.animation = "fadeIn .3s ease-out " + (endT+0.2).toFixed(2) + "s forwards";
+    halo.innerHTML = '<animate attributeName="r" values="5;13;5" dur="2.6s" repeatCount="indefinite" begin="'
+                     + (endT+0.2).toFixed(2) + 's"/>'
+                     + '<animate attributeName="opacity" values="0.75;0;0.75" dur="2.6s" repeatCount="indefinite" begin="'
+                     + (endT+0.2).toFixed(2) + 's"/>';
+  }
 
-  /* 最新值标签 */
+  /* 最新值标签 —— 最后浮现 */
   const lx = X(li), ly = Y(rows[li].c);
   const anchor = lx > W-140 ? "end" : "start";
   const off = lx > W-140 ? -10 : 10;
   const lab = el("text",{x:lx+off,y:ly-9,"text-anchor":anchor,fill:"#58a6ff","font-size":12,"font-weight":"600"},g);
   lab.textContent = fmt(st.close)+" 点";
+  if (!reduceMotion){
+    lab.style.animationDelay = (endT+0.15).toFixed(2) + "s";
+    lab.classList.add("anim-dot");
+  }
 })();
 
 /* ---------- 通道位置图 ---------- */
@@ -369,12 +454,19 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
     const p = r.pos==null ? 0 : Math.min(Math.max(r.pos,PMIN),PMAX);
     return (i?"L":"M")+X(i).toFixed(1)+","+Y(p).toFixed(1);
   }).join(" ");
-  el("path",{d:d,fill:"none",stroke:"#d29922","stroke-width":1.7,"stroke-linejoin":"round"},g);
+  const PDELAY = 0.9, PDUR = 2.0;
+  drawPath({d:d,fill:"none",stroke:"#d29922","stroke-width":1.7,"stroke-linejoin":"round"},
+           g, {delay:PDELAY, duration:PDUR});
 
   /* 当前点 */
   const li=n-1;
   const p = Math.min(Math.max(rows[li].pos,PMIN),PMAX);
-  el("circle",{cx:X(li),cy:Y(p),r:4.5,fill:"#d29922",stroke:"#0d1117","stroke-width":2},g);
+  const cur = el("circle",{cx:X(li),cy:Y(p),r:4.5,fill:"#d29922",
+                           stroke:"#0d1117","stroke-width":2},g);
+  if (!reduceMotion){
+    cur.style.animationDelay = (PDELAY+PDUR).toFixed(2) + "s";
+    cur.classList.add("anim-pop");
+  }
 })();
 
 /* ---------- 锚点表 ---------- */
