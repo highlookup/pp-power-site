@@ -1,9 +1,10 @@
-name: 站点数据月度更新
+name: 站点数据每日更新
 
 on:
   schedule:
-    # M2 通常每月 25 日公布 -> 25/26/27 各跑一次（北京时间 12:20）
-    - cron: '20 4 25-27 * *'
+    # 每日中午 12:20（北京时间）运行：当月指数随行情每日刷新
+    # M2 未公布时数据口径自动沿用外推，公布后自动切换官方值
+    - cron: '20 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -30,6 +31,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "无变化，跳过提交"
           else
-            git commit -m "月度数据更新 $(date -u '+%Y-%m')"
+            git commit -m "每日数据更新 $(date -u '+%Y-%m-%d')"
             git push
           fi
