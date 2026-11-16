@@ -3,15 +3,15 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: 'b030f6fe-957d-410f-b026-9aea215fac24'
-  PropagateID: 'b030f6fe-957d-410f-b026-9aea215fac24'
-  ReservedCode1: '75fd734c-3dc3-435d-8545-c5fbd95c6dc0'
-  ReservedCode2: '75fd734c-3dc3-435d-8545-c5fbd95c6dc0'
+  ProduceID: 'e80ff095-a91d-4bcc-bb7c-6ecb846ca177'
+  PropagateID: 'e80ff095-a91d-4bcc-bb7c-6ecb846ca177'
+  ReservedCode1: 'a7ea2294-1976-49d7-884a-2d0a086160f6'
+  ReservedCode2: 'a7ea2294-1976-49d7-884a-2d0a086160f6'
 ---
 
 # A股购买力顶底模型 · 月度监测站
 
-基于 M2/GDP 购买力通道的 A 股顶底位置监测。每月 12 日自动更新上证月线数据与央行官方 M2 数据，重算模型并刷新本页。
+基于 M2/GDP 购买力通道的 A 股顶底位置监测。每日 16:30（A股收盘后）自动更新上证月线数据与央行官方 M2 数据，重算模型并刷新本页。
 
 ## 模型
 
@@ -28,7 +28,7 @@ AIGC:
 | `template.html` | 页面模板（含样式与图表渲染逻辑） |
 | `data.json` | 月度数据与模型参数 |
 | `index.html` | 生成的自包含页面（GitHub Pages 入口） |
-| `.github/workflows/update.yml` | 每月 12 日自动运行 |
+| `.github/workflows/update.yml` | 每日 16:30（北京时间）自动运行 |
 
 ## 本地运行
 
