@@ -87,12 +87,13 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .legend i.dot{width:7px;height:7px;border-radius:50%}
 
 /* ---------- 表格 ---------- */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
-th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-size:11px;color:var(--dim2);font-weight:500;text-align:right}
 th:first-child,td:first-child{text-align:left}
 tbody tr:hover{background:rgba(88,166,255,.05)}
-.tag{font-size:10.5px;padding:1px 7px;border-radius:10px}
+.tag{font-size:10.5px;padding:1px 7px;border-radius:10px;display:inline-block;white-space:nowrap}
 .tag.hit{background:rgba(248,81,73,.15);color:var(--red)}
 .tag.low{background:rgba(63,185,80,.15);color:var(--green)}
 .mono{font-variant-numeric:tabular-nums}
@@ -139,6 +140,32 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
   .grid{grid-template-columns:repeat(2,1fr)}
   .cell .v{font-size:16px}
   th,td{padding:6px 5px;font-size:11.5px}
+
+  /* 锚点表：手机端改为卡片式 */
+  .anchor-tbl thead{display:none}
+  .anchor-tbl,
+  .anchor-tbl tbody,
+  .anchor-tbl tr,
+  .anchor-tbl td{display:block;width:auto}
+  .anchor-tbl tr{
+    display:grid;grid-template-columns:1fr 1fr;
+    column-gap:12px;row-gap:9px;
+    border:1px solid var(--line);border-radius:10px;
+    background:var(--panel2);
+    padding:11px 13px;margin-bottom:9px;
+  }
+  .anchor-tbl tr:last-child{margin-bottom:0}
+  .anchor-tbl tr:hover{background:var(--panel2)}
+  .anchor-tbl td{
+    border:none;padding:0;text-align:left;
+    font-size:13px;white-space:nowrap;
+  }
+  .anchor-tbl td::before{
+    content:attr(data-label);display:block;
+    font-size:10px;color:var(--dim2);margin-bottom:3px;font-weight:400;
+  }
+  .anchor-tbl td:first-child{grid-column:1 / -1;padding-bottom:2px}
+  .anchor-tbl td:first-child::before{display:none}
 }
 </style>
 </head>
@@ -207,12 +234,14 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
   <div class="card">
     <h2>模型锚点与历史验证</h2>
     <div class="desc">顶线由三轮流动性牛市顶拟合，底线由五轮历史大底拟合</div>
-    <table>
+    <div class="tbl-wrap">
+    <table class="anchor-tbl">
       <thead>
         <tr><th>类型</th><th>月份</th><th>指数</th><th>顶线</th><th>底线</th><th>通道位置</th><th>结果</th></tr>
       </thead>
       <tbody id="anchorBody"></tbody>
     </table>
+    </div>
   </div>
 
   <!-- 说明 -->
@@ -496,12 +525,12 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
       : (posv<=0.15 ? '<span class="tag low">触底</span>' : '<span class="tag">未触底</span>');
     tr.innerHTML =
       `<td>${isTop?'<span class="tag hit">顶线锚点</span>':'<span class="tag low">底线锚点</span>'}</td>`+
-      `<td class="mono">${month}</td>`+
-      `<td class="mono">${fmt(idx)}</td>`+
-      `<td class="mono">${fmt(r.top)}</td>`+
-      `<td class="mono">${fmt(r.bot)}</td>`+
-      `<td class="mono">${(posv*100).toFixed(0)}%</td>`+
-      `<td>${verdict}</td>`;
+      `<td class="mono" data-label="月份">${month}</td>`+
+      `<td class="mono" data-label="指数">${fmt(idx)}</td>`+
+      `<td class="mono" data-label="顶线">${fmt(r.top)}</td>`+
+      `<td class="mono" data-label="底线">${fmt(r.bot)}</td>`+
+      `<td class="mono" data-label="通道位置">${(posv*100).toFixed(0)}%</td>`+
+      `<td data-label="结果">${verdict}</td>`;
     body.appendChild(tr);
   };
 
@@ -512,12 +541,12 @@ marker.style.left = "calc(" + (Math.min(Math.max(st.pos,0),1)*100).toFixed(1) + 
   const tr = document.createElement("tr");
   tr.innerHTML =
     `<td><b>当前</b></td>`+
-    `<td class="mono">${st.month}</td>`+
-    `<td class="mono">${fmt(st.close)}</td>`+
-    `<td class="mono">${fmt(st.top)}</td>`+
-    `<td class="mono">${fmt(st.bot)}</td>`+
-    `<td class="mono">${(st.pos*100).toFixed(0)}%</td>`+
-    `<td>${st.zone}</td>`;
+    `<td class="mono" data-label="月份">${st.month}</td>`+
+    `<td class="mono" data-label="指数">${fmt(st.close)}</td>`+
+    `<td class="mono" data-label="顶线">${fmt(st.top)}</td>`+
+    `<td class="mono" data-label="底线">${fmt(st.bot)}</td>`+
+    `<td class="mono" data-label="通道位置">${(st.pos*100).toFixed(0)}%</td>`+
+    `<td data-label="结果">${st.zone}</td>`;
   body.appendChild(tr);
 })();
 
