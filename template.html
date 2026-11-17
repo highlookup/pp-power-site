@@ -134,6 +134,10 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
 }
 .foot{text-align:center;font-size:11px;color:var(--dim2);margin-top:26px;line-height:1.9}
 
+/* 窄屏切换用的长短标签（桌面默认显示长标签） */
+.lbl-full{display:inline}
+.lbl-mini{display:none}
+
 @media(max-width:640px){
   .price{font-size:34px}
   .hero{padding:18px}
@@ -141,31 +145,22 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
   .cell .v{font-size:16px}
   th,td{padding:6px 5px;font-size:11.5px}
 
-  /* 锚点表：手机端改为卡片式 */
-  .anchor-tbl thead{display:none}
-  .anchor-tbl,
-  .anchor-tbl tbody,
-  .anchor-tbl tr,
-  .anchor-tbl td{display:block;width:auto}
-  .anchor-tbl tr{
-    display:grid;grid-template-columns:1fr 1fr;
-    column-gap:12px;row-gap:9px;
-    border:1px solid var(--line);border-radius:10px;
-    background:var(--panel2);
-    padding:11px 13px;margin-bottom:9px;
-  }
-  .anchor-tbl tr:last-child{margin-bottom:0}
-  .anchor-tbl tr:hover{background:var(--panel2)}
-  .anchor-tbl td{
-    border:none;padding:0;text-align:left;
-    font-size:13px;white-space:nowrap;
-  }
-  .anchor-tbl td::before{
-    content:attr(data-label);display:block;
-    font-size:10px;color:var(--dim2);margin-bottom:3px;font-weight:400;
-  }
-  .anchor-tbl td:first-child{grid-column:1 / -1;padding-bottom:2px}
-  .anchor-tbl td:first-child::before{display:none}
+  /* 锚点表：手机端压缩成紧凑表格，7 列一屏放得下 */
+  body{padding:14px 8px 40px}
+  .card{padding:14px 10px 10px}
+  .anchor-tbl{table-layout:fixed;width:100%}
+  .anchor-tbl th,.anchor-tbl td{padding:6px 0;font-size:10px;letter-spacing:-.2px}
+  .anchor-tbl th{font-size:9px;letter-spacing:-.3px}
+  .anchor-tbl .tag{font-size:8.5px;padding:2px 4px;border-radius:5px;letter-spacing:-.3px}
+  .c-type{width:14%}
+  .c-mon{width:23%}
+  .c-idx{width:12%}
+  .c-top{width:12%}
+  .c-bot{width:13%}
+  .c-pos{width:13%}
+  .c-res{width:13%}
+  .lbl-full{display:none}
+  .lbl-mini{display:inline}
 }
 </style>
 </head>
@@ -237,7 +232,7 @@ tbody tr:hover{background:rgba(88,166,255,.05)}
     <div class="tbl-wrap">
     <table class="anchor-tbl">
       <thead>
-        <tr><th>类型</th><th>月份</th><th>指数</th><th>顶线</th><th>底线</th><th>通道位置</th><th>结果</th></tr>
+        <tr><th class="c-type">类型</th><th class="c-mon">月份</th><th class="c-idx">指数</th><th class="c-top">顶线</th><th class="c-bot">底线</th><th class="c-pos"><span class="lbl-full">通道位置</span><span class="lbl-mini">位置</span></th><th class="c-res">结果</th></tr>
       </thead>
       <tbody id="anchorBody"></tbody>
     </table>
