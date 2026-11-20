@@ -1,3 +1,5 @@
 update_local.log
+update_state.json
 __pycache__/
 *.pyc
+.backup_*/

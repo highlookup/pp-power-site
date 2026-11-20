@@ -2,13 +2,19 @@ name: 站点数据每日更新
 
 on:
   schedule:
-    # 每日 16:30（北京时间）运行：收盘后数据已定型，当月指数随行情每日刷新
-    # M2 未公布时数据口径自动沿用外推，公布后自动切换官方值
+    # 北京时间 16:30 / 19:30 / 22:30 三次尝试
+    # GitHub 免费版 schedule 只保证排队不保证准点，多时段大幅提高当日必中概率
     - cron: '30 8 * * *'
+    - cron: '30 11 * * *'
+    - cron: '30 14 * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: site-update
+  cancel-in-progress: false
 
 jobs:
   update:
@@ -23,7 +29,18 @@ jobs:
       - name: 生成站点数据与页面
         run: python build_site.py
 
+      - name: 判断是否有实质变化
+        id: check
+        run: |
+          git show HEAD:data.json > /tmp/remote.json || cp data.json /tmp/remote.json
+          if python check_data.py /tmp/remote.json data.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 提交更新
+        if: steps.check.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -31,6 +48,10 @@ jobs:
           if git diff --staged --quiet; then
             echo "无变化，跳过提交"
           else
-            git commit -m "每日数据更新 $(date -u '+%Y-%m-%d')"
+            git commit -m "每日数据更新 $(TZ=Asia/Shanghai date '+%Y-%m-%d')"
             git push
           fi
+
+      - name: 无变化说明
+        if: steps.check.outputs.changed != 'true'
+        run: echo "数据与线上一致，跳过提交（幂等）"

@@ -1,9 +1,11 @@
 @echo off
-rem 购买力顶底模型站点 · 每日更新（Windows 计划任务 16:30 调用）
-rem 由 update_local.py 完成：构建 -> 比对 -> 上传 -> 对齐
+chcp 65001 >nul
+rem Daily update for pp-power-site (called by Windows Task Scheduler 16:30-23:30 every 30 min)
+rem update_local.py does: time-window check -> build -> compare -> upload -> verify -> align
+rem Pass --force to skip the time window and idempotency checks.
 
 set PATH=C:\Users\Paul\.local\share\TeleAgent\runtimes\python;C:\Program Files\GitHub CLI;C:\Program Files\Git\cmd;%PATH%
 cd /d "%~dp0"
 
-"C:\Users\Paul\.local\share\TeleAgent\runtimes\python\python.exe" "%~dp0update_local.py"
+"C:\Users\Paul\.local\share\TeleAgent\runtimes\python\python.exe" "%~dp0update_local.py" %*
 exit /b %ERRORLEVEL%
