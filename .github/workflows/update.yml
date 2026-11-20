@@ -2,12 +2,19 @@ name: 站点数据每日更新
 
 on:
   schedule:
-    # 北京时间 16:30 / 19:30 / 22:30 三次尝试
-    # GitHub 免费版 schedule 只保证排队不保证准点，多时段大幅提高当日必中概率
-    - cron: '30 8 * * *'
-    - cron: '30 11 * * *'
-    - cron: '30 14 * * *'
+    # GitHub 免费版 schedule 为 best-effort，整点/半点（0 分、30 分）是全局拥堵高峰，
+    # 实测延迟 3~9 小时甚至整日跳过。故全部改用冷门分钟数，并在一天内分散多个时段。
+    # 以下为 UTC，对应北京时间：
+    #   08:07 -> 16:07   09:23 -> 17:23   11:11 -> 19:11
+    #   13:37 -> 21:37   15:49 -> 23:49
+    - cron: '7 8 * * *'
+    - cron: '23 9 * * *'
+    - cron: '11 11 * * *'
+    - cron: '37 13 * * *'
+    - cron: '49 15 * * *'
   workflow_dispatch:
+  repository_dispatch:
+    types: [daily-update]
 
 permissions:
   contents: write
