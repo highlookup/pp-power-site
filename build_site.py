@@ -7,8 +7,17 @@
 """
 import json
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# 北京时间（UTC+8）。GitHub Actions 运行在 UTC，必须显式换算，
+# 否则云端生成的时间戳会比北京时间慢 8 小时，页面显示的时间看起来像没更新。
+BJ_TZ = timezone(timedelta(hours=8))
+
+
+def now_bj():
+    """返回北京时间的当前时间（带时区信息）。"""
+    return datetime.now(BJ_TZ)
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 HERE = Path(__file__).resolve().parent
@@ -55,7 +64,7 @@ def http_json(url):
 
 def fetch_sse_months(start="1999-01-01"):
     """腾讯上证月线：{YYYY-MM: (high, low, close)}"""
-    end = datetime.now().strftime("%Y-%m-%d")
+    end = now_bj().strftime("%Y-%m-%d")
     url = ("https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
            f"param=sh000001,month,{start},{end},400,qfq")
     j = http_json(url)
@@ -230,10 +239,10 @@ def main():
         else:
             trend = "较上月基本持平"
 
-    incomplete = (last["m"] == datetime.now().strftime("%Y-%m"))
+    incomplete = (last["m"] == now_bj().strftime("%Y-%m"))
 
     data = {
-        "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated": now_bj().strftime("%Y-%m-%d %H:%M"),
         "incomplete": incomplete,
         "params": {"Kt": round(Kt, 6), "Bt": round(Bt, 4),
                    "Kb": round(Kb, 6), "Bb": round(Bb, 4)},
