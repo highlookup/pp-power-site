@@ -35,6 +35,14 @@ STATE = os.path.join(ROOT, "update_state.json")
 EARLIEST_HOUR = 16      # 收盘后时间点：此刻之后的成功更新才算「当日收盘已采集」
 EARLIEST_MIN = 30
 
+# ---- 本机降级为「纯兜底」----
+# 主更新由云端负责（cron-job.org 16:30/18:30/20:30 + GitHub cron 多时段）。
+# 本机只在 FALLBACK_HOUR 之后才出手，此时云端三次触发已全部跑完、
+# 若仍未上线则说明云端链路确实挂了，由本机补上。
+# 好处：正常情况本机只是「查一下就退」（几秒），不会与云端抢跑产生重复提交/409。
+FALLBACK_HOUR = 21
+FALLBACK_MIN = 0
+
 
 def log(msg):
     line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
@@ -136,22 +144,15 @@ def target_date():
     return (now - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
-def already_done():
-    """判断目标交易日是否已经成功更新过（依据本地状态标记 + 线上自洽性）
+def online_ok():
+    """线上是否已经是目标交易日的最新数据（页面与数据自洽）。
 
-    除本地标记外，额外确认「线上数据是目标交易日」且「页面与数据时间戳一致」。
-    原因：标记只在旧版逻辑下写入，可能早于「data.json 已传、index.html 未传」
-    的情况发生，只信标记会让页面永远停在旧版本（11-24 事故）。
+    这是降级为纯兜底后的唯一判断依据：不依赖本地 update_state.json，
+    因为云端更新成功时根本不会写本地状态文件。只要线上对了就说明
+    「某条链路（云端或本机）已经成功」，本机无需再做任何事。
     """
-    st = load_state()
-    done_day = st.get("done_for") or ""
-    if not (bool(done_day) and done_day >= target_date()):
-        return False
     remote = remote_data()
-    if remote is None:
-        # 网络异常时不阻塞（避免断网时反复重试），交由后续正常流程处理
-        return True
-    if not remote_is_target(remote):
+    if remote is None or not remote_is_target(remote):
         return False
     r_gen = remote_index_generated()
     return bool(r_gen) and r_gen == remote.get("generated")
@@ -206,11 +207,20 @@ def align():
 
 def main():
     force = "--force" in sys.argv
+    now = datetime.now()
 
     if not force:
-        if already_done():
-            log(f"目标交易日 {target_date()} 已完成更新，跳过")
+        # 兜底时段门槛：云端 16:30/18:30/20:30 三次触发跑完之前本机不出手，
+        # 避免与云端抢跑。只有 21:00 之后云端仍未上线，才由本机补。
+        if (now.hour, now.minute) < (FALLBACK_HOUR, FALLBACK_MIN):
+            log(f"{now:%H:%M} 未到兜底时段（{FALLBACK_HOUR}:{FALLBACK_MIN:02d}），"
+                f"云端负责更新，本机跳过")
             return 0
+        # 线上已就绪（云端已成功）→ 本机无需动作
+        if online_ok():
+            log(f"线上已是目标交易日 {target_date()} 的数据，云端已成功，本机无需补跑")
+            return 0
+        log(f"线上仍不是目标交易日 {target_date()} 的数据 → 云端可能失败，本机接手兜底")
 
     log(f"=== 开始每日更新（目标交易日 {target_date()}）===")
     if not build():
