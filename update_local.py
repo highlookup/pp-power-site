@@ -19,8 +19,10 @@
 import base64
 import json
 import os
+import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -93,6 +95,24 @@ def remote_data():
         return None
 
 
+def remote_index_generated():
+    """取远程 index.html 内嵌的 generated 时间戳（失败返回 None）
+
+    为什么要单独校验：data.json 上传成功、index.html 上传失败时，若只看
+    data.json 会误判为「已完成」，导致页面长期停留在旧版本（11-24 事故）。
+    """
+    rc, out, err = gh(["api", f"repos/{REPO}/contents/index.html?ref={BRANCH}",
+                       "--jq", ".content"])
+    if rc != 0 or not out.strip():
+        return None
+    try:
+        raw = base64.b64decode(out.strip()).decode("utf-8", "replace")
+    except Exception:
+        return None
+    m = re.search(r'"generated"\s*:\s*"([^"]*)"', raw)
+    return m.group(1) if m else None
+
+
 def substantive(data):
     """剔除时间戳后的实质内容，用于判断是否真有变化"""
     if not isinstance(data, dict):
@@ -117,10 +137,24 @@ def target_date():
 
 
 def already_done():
-    """判断目标交易日是否已经成功更新过（依据本地状态标记）"""
+    """判断目标交易日是否已经成功更新过（依据本地状态标记 + 线上自洽性）
+
+    除本地标记外，额外确认「线上数据是目标交易日」且「页面与数据时间戳一致」。
+    原因：标记只在旧版逻辑下写入，可能早于「data.json 已传、index.html 未传」
+    的情况发生，只信标记会让页面永远停在旧版本（11-24 事故）。
+    """
     st = load_state()
     done_day = st.get("done_for") or ""
-    return bool(done_day) and done_day >= target_date()
+    if not (bool(done_day) and done_day >= target_date()):
+        return False
+    remote = remote_data()
+    if remote is None:
+        # 网络异常时不阻塞（避免断网时反复重试），交由后续正常流程处理
+        return True
+    if not remote_is_target(remote):
+        return False
+    r_gen = remote_index_generated()
+    return bool(r_gen) and r_gen == remote.get("generated")
 
 
 def remote_is_target(remote):
@@ -131,21 +165,29 @@ def remote_is_target(remote):
     return g.startswith(target_date())
 
 
-def upload(path):
+def upload(path, tries=3):
     full = os.path.join(ROOT, path)
     with open(full, "rb") as f:
         content = base64.b64encode(f.read()).decode()
-    payload = {"message": f"每日数据更新 {datetime.now():%Y-%m-%d}", "content": content, "branch": BRANCH}
-    rc, out, err = gh(["api", f"repos/{REPO}/contents/{path}?ref={BRANCH}", "--jq", ".sha"])
-    if rc == 0 and out.strip():
-        payload["sha"] = out.strip()
-    rc, out, err = gh(["api", "-X", "PUT", f"repos/{REPO}/contents/{path}", "--input", "-"],
-                      inp=json.dumps(payload))
-    if rc != 0:
-        log(f"  上传失败 {path}: {err.strip()[:200]}")
-        return False
-    log(f"  已上传 {path}")
-    return True
+    last = ""
+    for i in range(1, tries + 1):
+        # 每次都重取 sha，避免上一次失败/并发导致 sha 过期
+        payload = {"message": f"每日数据更新 {datetime.now():%Y-%m-%d}",
+                   "content": content, "branch": BRANCH}
+        rc, out, err = gh(["api", f"repos/{REPO}/contents/{path}?ref={BRANCH}", "--jq", ".sha"])
+        if rc == 0 and out.strip():
+            payload["sha"] = out.strip()
+        rc, out, err = gh(["api", "-X", "PUT", f"repos/{REPO}/contents/{path}",
+                           "--input", "-"], inp=json.dumps(payload))
+        if rc == 0:
+            log(f"  已上传 {path}")
+            return True
+        last = (err or out or "").strip()[:200] or f"exit={rc}"
+        log(f"  上传失败 {path}（第 {i}/{tries} 次）: {last}")
+        if i < tries:
+            time.sleep(3 * i)
+    log(f"  {path} 最终上传失败: {last}")
+    return False
 
 
 def align():
@@ -183,12 +225,38 @@ def main():
         return 1
 
     remote = remote_data()
-    if remote is not None and substantive(local) == substantive(remote) and remote_is_target(remote):
-        log(f"线上已是目标交易日 {target_date()} 的最新数据，无需推送")
+    r_gen = remote_index_generated()
+    # 页面是否与远程数据自洽：只比数据与页面彼此是否一致，
+    # 不比本地构楚值。本地与云端完全可能相差一分钟，比本地会误判为「未同步」而反复上传。
+    r_data_gen = (remote or {}).get("generated")
+    page_ok = bool(r_gen) and r_gen == r_data_gen
+
+    if (remote is not None and substantive(local) == substantive(remote)
+            and remote_is_target(remote) and page_ok):
+        log(f"线上已是目标交易日 {target_date()} 的最新数据（数据与页面自洽）")
         save_state({"last_success": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "done_for": target_date(),
                     "note": "already-fresh"})
         align()
+        return 0
+
+    if (remote is not None and substantive(local) == substantive(remote)
+            and remote_is_target(remote) and not page_ok):
+        # 数据已正确、仅页面掉队：只补页面，避免无意义的 data.json 空提交
+        log(f"数据已就绪但页面掉队（data={r_data_gen}，page={r_gen}）→ 仅补传 index.html")
+        if not upload("index.html"):
+            log("页面补传失败（下次触发会重试）")
+            return 1
+        v_gen = remote_index_generated()
+        if remote_is_target(remote_data()) and v_gen == r_data_gen:
+            log("已确认页面与数据一致")
+            save_state({"last_success": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "done_for": target_date(),
+                        "note": "page-only"})
+        else:
+            log(f"警告：页面补传后仍未自洽（page={v_gen}），保持未完成以便重试")
+        align()
+        log("=== 完成 ===")
         return 0
 
     log("有实质变化，开始上传 data.json / index.html")
@@ -200,15 +268,18 @@ def main():
         log("部分文件上传失败（下次触发会重试）")
         return 1
 
-    # 上传后重新校验：只有确认线上是目标交易日的数据才记成功
+    # 上传后重新校验：远程数据是目标交易日，且页面与数据自洽
     verify = remote_data()
-    if remote_is_target(verify):
-        log(f"已确认线上为目标交易日 {target_date()} 的数据")
+    v_gen = remote_index_generated()
+    v_data_gen = (verify or {}).get("generated")
+    if remote_is_target(verify) and v_gen and v_gen == v_data_gen:
+        log(f"已确认线上为目标交易日 {target_date()} 的数据（数据={v_data_gen}，页面={v_gen}）")
         save_state({"last_success": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "done_for": target_date(),
                     "note": "uploaded"})
     else:
-        log("警告：上传后线上时间戳仍不符目标交易日，保持未完成状态以便下次重试")
+        log(f"警告：上传后校验未通过（data={verify.get('generated') if verify else None}，"
+            f"index={v_gen}），保持未完成状态以便下次重试")
 
     align()
     log("=== 完成 ===")

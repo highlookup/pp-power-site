@@ -42,11 +42,23 @@ jobs:
         id: check
         run: |
           git show HEAD:data.json > /tmp/remote.json || cp data.json /tmp/remote.json
+          git show HEAD:index.html > /tmp/remote.html || cp index.html /tmp/remote.html
+          changed=false
           if python check_data.py /tmp/remote.json data.json; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "数据实质内容一致"
           else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "数据实质内容有变化"
+            changed=true
           fi
+          # 页面自洽性：已提交的 index.html 内嵌时间戳必须与已提交的 data.json 一致。
+          # 防止「data.json 已推送但 index.html 未推送」导致页面长期停留旧版本（11-24 事故）。
+          if python check_page.py /tmp/remote.html /tmp/remote.json; then
+            echo "页面自洽"
+          else
+            echo "页面掉队，需要重新提交"
+            changed=true
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: 提交更新
         if: steps.check.outputs.changed == 'true'
