@@ -54,15 +54,12 @@ def log(msg):
         pass
 
 
-def load_state():
-    try:
-        with open(STATE, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
 def save_state(d):
+    """记录本机最近一次成功动作（仅供排查，不参与任何判断逻辑）。
+
+    降级为纯兜底后，是否要补跑只看线上实际状态（online_ok），
+    不再读取本文件——云端成功时不会写它，读它会造成误判。
+    """
     try:
         with open(STATE, "w", encoding="utf-8") as f:
             json.dump(d, f, ensure_ascii=False, indent=2)
