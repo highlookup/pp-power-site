@@ -58,6 +58,16 @@ jobs:
             echo "页面掉队，需要重新提交"
             changed=true
           fi
+          # 收盘窗口：北京时间 15:30 前数据源的「当月K线」还是盘中价，
+          # 此时绝不能提交（11-24 上午曾把盘中价 3569.23 写成当日收盘）。
+          if [ "$changed" = "true" ]; then
+            if python check_window.py; then
+              echo "已过收盘窗口，可以提交"
+            else
+              echo "未到收盘窗口，本次不提交（等待后续触发）"
+              changed=false
+            fi
+          fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: 提交更新

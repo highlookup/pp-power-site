@@ -43,6 +43,12 @@ EARLIEST_MIN = 30
 FALLBACK_HOUR = 21
 FALLBACK_MIN = 0
 
+# ---- 收盘窗口 ----
+# A股 15:00 收盘，留 30 分钟给数据源更新。早于此值，数据源返回的当月K线
+# close 字段是盘中最新价而非收盘价，绝不能写入线上（11-24 上午曾写入 3569.23）。
+CLOSE_HOUR = 15
+CLOSE_MIN = 30
+
 
 def log(msg):
     line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
@@ -218,6 +224,13 @@ def main():
             log(f"线上已是目标交易日 {target_date()} 的数据，云端已成功，本机无需补跑")
             return 0
         log(f"线上仍不是目标交易日 {target_date()} 的数据 → 云端可能失败，本机接手兜底")
+    else:
+        # --force 也不能绕过收盘窗口：数据源的当月K线在 15:30 前是盘中价，
+        # 强推会把盘中价当成收盘价写进线上（11-24 上午事故）。
+        if (now.hour, now.minute) < (CLOSE_HOUR, CLOSE_MIN):
+            log(f"{now:%H:%M} 早于收盘窗口 {CLOSE_HOUR}:{CLOSE_MIN:02d}，"
+                f"数据源当月K线仍为盘中价，拒绝提交（--force 也不绕过）")
+            return 1
 
     log(f"=== 开始每日更新（目标交易日 {target_date()}）===")
     if not build():
