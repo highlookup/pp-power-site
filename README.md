@@ -3,13 +3,13 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: 'e80ff095-a91d-4bcc-bb7c-6ecb846ca177'
-  PropagateID: 'e80ff095-a91d-4bcc-bb7c-6ecb846ca177'
-  ReservedCode1: 'a7ea2294-1976-49d7-884a-2d0a086160f6'
-  ReservedCode2: 'a7ea2294-1976-49d7-884a-2d0a086160f6'
+  ProduceID: 'fe53359d-003b-4d7c-b243-f3c9f7554ef7'
+  PropagateID: 'fe53359d-003b-4d7c-b243-f3c9f7554ef7'
+  ReservedCode1: '831d71de-d16a-4870-a32f-19d92e77a40e'
+  ReservedCode2: '831d71de-d16a-4870-a32f-19d92e77a40e'
 ---
 
-# A股购买力顶底模型 · 月度监测站
+# 吊A购买力顶底模型 · 月度监测站
 
 基于 M2/GDP 购买力通道的 A 股顶底位置监测。每日 16:30（A股收盘后）自动更新上证月线数据与央行官方 M2 数据，重算模型并刷新本页。
 
